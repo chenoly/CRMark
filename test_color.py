@@ -11,12 +11,19 @@ os.makedirs("images", exist_ok=True)
 # Initialize CRMark in color mode
 crmark = CRMark(model_mode="color_256_100", float64=False)
 
-
-# Generate a random string of length 3 (total 24 bits)
+# Generate a random string of length 7 (total 56 bits)
 def generate_random_string(n: int) -> str:
     characters = string.ascii_letters + string.digits
     return ''.join(random.choices(characters, k=n))
 
+# Calculate PSNR between two images
+def calculate_psnr(img1, img2):
+    mse = np.mean((img1 - img2) ** 2)
+    if mse == 0:
+        return float('inf')
+    PIXEL_MAX = 255.0
+    psnr = 20 * np.log10(PIXEL_MAX / np.sqrt(mse))
+    return psnr
 
 # Random string message
 str_data = generate_random_string(7)
@@ -42,6 +49,10 @@ rec_cover_clean.save(rec_cover_path)
 cover = np.float32(Image.open(cover_path))
 rec_clean = np.float32(rec_cover_clean)
 diff_clean = np.sum(np.abs(cover - rec_clean))
+
+# Compute PSNR between cover and clean stego image
+stego_clean = np.float32(Image.open(stego_path_clean))
+psnr_clean = calculate_psnr(cover, stego_clean)
 
 # === Case 2: With attack ===
 # Slightly modify the image to simulate attack
@@ -70,6 +81,7 @@ print("Recovered Message:", rec_message_clean)
 print("Extracted Message:", extracted_message_clean)
 print("Is Attacked:", is_attacked_clean)
 print("L1 Pixel Difference:", diff_clean)
+print("PSNR (Cover vs Stego):", psnr_clean)
 
 print("\n=== With Attack ===")
 print("Recovered Message:", rec_message_attacked)
