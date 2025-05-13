@@ -282,7 +282,7 @@ class Model(nn.Module):
                            'bit_length': self.bit_length,
                            'img_size': self.img_size,
                            'channel_dim': self.channel_dim,
-                           'min_size': self.img_size,
+                           'min_size': self.min_size,
                            'fc': self.fc,
                            'k': self.k
                            }
