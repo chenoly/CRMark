@@ -179,9 +179,6 @@ class CRMark(object):
         assert model_mode in ["color_256_64", "color_256_100",
                               "gray_512_256"], "model_mode must be 'color_256_64', 'color_256_100' or 'gray_512_256'"
 
-        # Download required model weights
-        _download_models(model_mode)
-
         # Initialize instance variables
         self.k = None  # Model parameter for kernel size
         self.fc = None  # Fully connected layer configuration
@@ -228,6 +225,8 @@ class CRMark(object):
         color_256_100_model_path = os.path.join(base_cache_dir, "crmark_color_size_256_bit_100.pth")
 
         if model_path is None:
+            # Download required model weights
+            _download_models(model_mode)
             # Load the appropriate model based on color mode
             if model_mode == "color_256_64":
                 self.load_model(color_256_64_model_path)
