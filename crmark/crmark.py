@@ -6,6 +6,7 @@ import requests
 import numpy as np
 from PIL import Image
 from tqdm import tqdm
+from numpy import ndarray
 from crmark.nets import Model
 from torchvision import transforms
 from typing import Tuple, Union, Any
@@ -160,7 +161,7 @@ class CRMark(object):
 
         Parameters:
             model_mode (str): The model variant to use. Must be one of:
-                - "color_256_64": For RGB images, embeds 64 bits total, allowing 3 characters (24 bits) after BCH coding.
+                - "color_256_64": For RGB images, embeds 64 bits total, allowing 5 characters (24 bits) after BCH coding.
                 - "color_256_100": For RGB images, embeds 100 bits total, allowing 7 characters (56 bits) after BCH coding.
                 - "gray_512_256": For grayscale images, embeds 256 bits total, allowing 20 characters (160 bits) after BCH coding.
             model_path (str): the pretrained model path for load. Default is None.
@@ -279,15 +280,15 @@ class CRMark(object):
         self.iIWN.to(self.device)
         self.iIWN.eval()  # Set model to evaluation mode
 
-    def encode(self, img_path: str, message: str) -> Tuple[bool, Any]:
+    def encode(self, cover_img: ndarray, message: str) -> Tuple[bool, Any]:
         """
         Embed a text message into an image as a watermark.
 
         Parameters:
-            img_path (str): The file path to the cover image in which the message will be embedded.
+            cover_img (ndarray): The cover image in which the message will be embedded.
             message (str): The text message to embed.
                            The required message length depends on the model's color mode:
-                               - "color_256_64": length must be 3
+                               - "color_256_64": length must be 5
                                - "color_256_100": length must be 7
                                - "gray_512_256": length must be 20
 
@@ -297,22 +298,21 @@ class CRMark(object):
                 - PIL.Image: The resulting stego image containing the embedded watermark.
         """
         # Load and validate the cover image
-        cover_img = Image.open(img_path)
-        cover_img_ndarray = np.uint8(cover_img)
+        cover_img = np.uint8(cover_img)
 
         # Validate message length and image dimensions
         if self.model_mode == "color_256_64":
-            assert len(message) == 5 and cover_img_ndarray.ndim == 3, \
+            assert len(message) == 5 and cover_img.ndim == 3, \
                 "For color_256_64 model, the message length should be 5 and image must be RGB"
         if self.model_mode == "color_256_100":
-            assert len(message) == 7 and cover_img_ndarray.ndim == 3, \
+            assert len(message) == 7 and cover_img.ndim == 3, \
                 "For color_256_100 model, the message length should be 7 and image must be RGB"
         if self.model_mode == "gray_512_256":
-            assert len(message) == 20 and cover_img_ndarray.ndim == 2, \
+            assert len(message) == 20 and cover_img.ndim == 2, \
                 "For gray_512_256 model, the message length should be 20 and image must be grayscale"
 
         # Compute image hash for integrity verification
-        cover_img_hash = sha256_of_image_array(cover_img_ndarray)
+        cover_img_hash = sha256_of_image_array(cover_img)
         cover_img_hash_bitstream = sha256_to_bitstream(cover_img_hash)
 
         # Transform image to tensor
@@ -342,12 +342,12 @@ class CRMark(object):
 
         return issuccessful, Image.fromarray(np.uint8(rdh_stego_img))
 
-    def recover(self, stego_img_path: str) -> Union[Tuple[bool, Any, Any], Tuple[bool, None, None]]:
+    def recover(self, stego_img: ndarray) -> Union[Tuple[bool, Any, Any], Tuple[bool, None, None]]:
         """
         Recover the original cover image and embedded message from a stego image.
 
         Parameters:
-            stego_img_path (str): Path to the stego image containing the watermark.
+            stego_img (ndarray): The stego image containing the watermark.
 
         Returns:
             Union[Tuple[bool, PIL.Image, str], Tuple[bool, None, None]]:
@@ -356,11 +356,10 @@ class CRMark(object):
                 - str or None: Recovered message, or None if recovery fails.
         """
         # Load stego image
-        stego_img = Image.open(stego_img_path)
-        stego_img_ndarray = np.uint8(stego_img)
+        stego_img = np.uint8(stego_img)
 
         # Extract data using RDH
-        issuccessful, clipped_stego_img, ext_auxbits = self.rdh.extract(stego_img_ndarray)
+        issuccessful, clipped_stego_img, ext_auxbits = self.rdh.extract(stego_img)
         if issuccessful:
             # Extract image hash and decompress stego image
             cover_img_hash_bitstream = ext_auxbits[-256:]
@@ -398,12 +397,12 @@ class CRMark(object):
         else:
             return True, None, None
 
-    def decode(self, stego_img_path: str) -> Tuple[bool, str]:
+    def decode(self, stego_img: ndarray) -> Tuple[bool, str]:
         """
         Extract and decode the embedded message from a stego image.
 
         Parameters:
-            stego_img_path (str): Path to the stego image containing the watermark.
+            stego_img (ndarray): The stego image containing the watermark.
 
         Returns:
             Tuple[bool, str]:
@@ -411,9 +410,8 @@ class CRMark(object):
                 - str: The decoded message extracted from the watermark.
         """
         # Load and transform stego image
-        stego_img = Image.open(stego_img_path)
-        stego_img_ndarray = np.uint8(stego_img)
-        stego_img_tensor = self.transform(stego_img_ndarray).unsqueeze(0).to(self.device)
+        stego_img = np.uint8(stego_img)
+        stego_img_tensor = self.transform(stego_img).unsqueeze(0).to(self.device)
 
         # Generate random noise for decoding
         sampled_z = torch.randn(size=(1, self.bit_length)).to(self.device)
@@ -429,12 +427,12 @@ class CRMark(object):
         isdecode, decoded_data = self.bch.Decode(valid_part)
         return isdecode, decoded_data
 
-    def encode_bits(self, img_path: str, watermark: list) -> Tuple[bool, Any]:
+    def encode_bits(self, cover_img: ndarray, watermark: list) -> Tuple[bool, Any]:
         """
         Embed a binary watermark into an image.
 
         Parameters:
-            img_path (str): Path to the cover image to embed the watermark.
+            cover_img (ndarray): The cover image to embed the watermark.
             watermark (list): List of binary values (0 or 1) to embed as the watermark.
 
         Returns:
@@ -443,11 +441,10 @@ class CRMark(object):
                 - PIL.Image: The stego image with the embedded watermark.
         """
         # Load cover image
-        cover_img = Image.open(img_path)
-        cover_img_ndarray = np.uint8(cover_img)
+        cover_img = np.uint8(cover_img)
 
         # Compute image hash
-        cover_img_hash = sha256_of_image_array(cover_img_ndarray)
+        cover_img_hash = sha256_of_image_array(cover_img)
         cover_img_hash_bitstream = sha256_to_bitstream(cover_img_hash)
 
         # Transform image to tensor
@@ -472,12 +469,12 @@ class CRMark(object):
             print("The reversible embedding is failed")
         return issuccessful, Image.fromarray(np.uint8(rdh_stego_img))
 
-    def recover_bits(self, stego_img_path: str) -> Union[Tuple[bool, Any, Any], Tuple[bool, None, None]]:
+    def recover_bits(self, stego_img: ndarray) -> Union[Tuple[bool, Any, Any], Tuple[bool, None, None]]:
         """
         Recover the original cover image and binary watermark from a stego image.
 
         Parameters:
-            stego_img_path (str): Path to the stego image containing the watermark.
+            stego_img (ndarray): The stego image containing the watermark.
 
         Returns:
             Union[Tuple[bool, PIL.Image, list], Tuple[bool, None, None]]:
@@ -486,11 +483,10 @@ class CRMark(object):
                 - list or None: Recovered watermark as a list of bits, or None if recovery fails.
         """
         # Load stego image
-        stego_img = Image.open(stego_img_path)
-        stego_img_ndarray = np.uint8(stego_img)
+        stego_img = np.uint8(stego_img)
 
         # Extract data using RDH
-        issuccessful, clipped_stego_img, ext_auxbits = self.rdh.extract(stego_img_ndarray)
+        issuccessful, clipped_stego_img, ext_auxbits = self.rdh.extract(stego_img)
         if issuccessful:
             # Extract image hash and decompress stego image
             cover_img_hash_bitstream = ext_auxbits[-256:]
@@ -526,20 +522,19 @@ class CRMark(object):
         else:
             return True, None, None
 
-    def decode_bits(self, stego_img_path: str) -> list:
+    def decode_bits(self, stego_img: ndarray) -> list:
         """
         Extract the binary watermark from a stego image.
 
         Parameters:
-            stego_img_path (str): Path to the stego image containing the watermark.
+            stego_img (ndarray): The stego image containing the watermark.
 
         Returns:
             list: The extracted watermark as a list of binary values (0 or 1).
         """
         # Load and transform stego image
-        stego_img = Image.open(stego_img_path)
-        stego_img_ndarray = np.uint8(stego_img)
-        stego_img_tensor = self.transform(stego_img_ndarray).unsqueeze(0).to(self.device)
+        stego_img = np.uint8(stego_img)
+        stego_img_tensor = self.transform(stego_img).unsqueeze(0).to(self.device)
 
         # Generate random noise for decoding
         sampled_z = torch.randn(size=(1, self.bit_length)).to(self.device)
