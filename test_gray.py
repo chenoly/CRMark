@@ -21,12 +21,14 @@ stego_path_attacked = "images/gray_stego_attacked.png"
 
 # === Case 1: Without attack ===
 # Encode message into grayscale image
-success, stego_image = crmark.encode(cover_path, message)
+cover_image = np.float32(Image.open(cover_path))
+success, stego_image = crmark.encode(cover_image, message)
 stego_image.save(stego_path_clean)
 
 # Decode and recover from clean stego image
-is_attacked_clean, rec_cover_clean, rec_message_clean = crmark.recover(stego_path_clean)
-is_decoded_clean, ext_message_clean = crmark.decode(stego_path_clean)
+stego_clean_image = np.float32(Image.open(stego_path_clean))
+is_attacked_clean, rec_cover_clean, rec_message_clean = crmark.recover(stego_clean_image)
+is_decoded_clean, ext_message_clean = crmark.decode(stego_clean_image)
 rec_cover_clean.save(rec_cover_path)
 
 # Compute L1 pixel difference
@@ -47,8 +49,9 @@ stego[rand_y, rand_x] = np.clip(stego[rand_y, rand_x] + perturbation, 0, 255)
 Image.fromarray(np.uint8(stego)).save(stego_path_attacked)
 
 # Decode and recover from attacked image
-is_attacked, rec_cover_attacked, rec_message_attacked = crmark.recover(stego_path_attacked)
-is_decoded, ext_message_attacked = crmark.decode(stego_path_attacked)
+stego_attack_image = np.float32(Image.open(stego_path_attacked))
+is_attacked, rec_cover_attacked, rec_message_attacked = crmark.recover(stego_attack_image)
+is_decoded, ext_message_attacked = crmark.decode(stego_attack_image)
 
 rec_attacked = np.float32(rec_cover_attacked)
 diff_attacked = np.sum(np.abs(cover - rec_attacked))
