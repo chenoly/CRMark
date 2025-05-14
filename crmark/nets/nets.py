@@ -192,60 +192,6 @@ class Model(nn.Module):
                 x1, x2 = inn_block(x1, x2, hard_round, True)
         return x1, x2
 
-    def train_batch(self, args, noise_layer, cover, secret, now_step):
-        stego, drop_z = self.forward(cover, secret, args.hard_round, False)
-        noised_stego = noise_layer(stego, cover, now_step)
-        drop_z_backward = torch.randn_like(drop_z)
-        recon_cover, recon_secret = self.forward(noised_stego, drop_z_backward, args.hard_round, True)
-        loss_penalty = self.PMSE(stego)
-        loss_stego = self.MSE(stego, cover)
-        loss_lpips = self.LLoss(stego, cover)
-        loss_secret = self.MSE(recon_secret, secret)
-        loss = args.lambda_penalty * loss_penalty + args.lambda_stego * loss_stego + args.lambda_lpips * loss_lpips + args.lambda_secret * loss_secret
-        result = {
-            "train_values": {
-                "train_total_loss": loss,
-                "train_accuracy": extract_accuracy(recon_secret, secret),
-                'train_lambda_secret': args.lambda_secret,
-                "train_loss_lpips": loss_lpips.item(),
-                "train_loss_stego": loss_stego.item(),
-                "train_loss_secret": loss_secret.item(),
-                "train_loss_penalty": loss_penalty.item(),
-                "train_overflow_0": overflow_num(stego, 0),
-                "train_overflow_255": overflow_num(stego, 255),
-                "train_stego_psnr": compute_psnr(stego, cover)
-            }
-        }
-        return result
-
-    def val_batch(self, args, noise_layer, intensity, val_cover, val_secret):
-        secret_shape = (args.batch_size, 1, int(args.bit_length ** 0.5), int(args.bit_length ** 0.5))
-        val_stego, val_drop_z = self.forward(val_cover, val_secret, True, False)
-        val_noised_stego = noise_layer.test(quantize_image(val_stego), val_cover, intensity)
-        round_val_noised_stego = self.round(val_noised_stego, True)
-        val_recon_cover, val_recon_secret = self.forward(round_val_noised_stego, torch.randn_like(val_drop_z), True,
-                                                         True)
-        result = {
-            "val_values": {
-                "val_accuracy": extract_accuracy(val_recon_secret, val_secret),
-                "val_overflow_0": overflow_num(val_stego, 0),
-                "val_overflow_255": overflow_num(val_stego, 255),
-                "val_stego_psnr": compute_psnr(val_stego, val_cover)
-            },
-            "val_images": {
-                "val_cover": val_cover,
-                "val_noised_stego": quantize_image(val_noised_stego),
-                "val_stego": quantize_image(val_stego),
-                "val_residual": quantize_residual_image(val_stego, val_cover),
-                "val_recon_cover": quantize_image(val_recon_cover),
-            }
-        }
-        if int(args.bit_length ** 0.5) ** 2 == args.bit_length:
-            result["val_images"]["val_z"] = quantize_image(val_drop_z.view(secret_shape))
-            result["val_images"]["val_secret"] = quantize_image(val_secret.view(secret_shape))
-            result["val_images"]["val_recon_secret"] = quantize_image(val_recon_secret.view(secret_shape))
-        return result
-
     def load_model(self, model_path, optim_blocks=None, scheduler_blocks=None):
         try:
             if os.path.exists(model_path):
