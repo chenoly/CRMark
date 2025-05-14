@@ -12,7 +12,7 @@ Key features:
 ---
 ## 🚀 Usage
 ```bash
-pip install crmark
+pip install crmark==0.0.4
 ```
 
 code
@@ -37,24 +37,36 @@ def generate_random_string(n: int) -> str:
     return ''.join(random.choices(characters, k=n))
 
 
+# Calculate PSNR between two images
+def calculate_psnr(img1, img2):
+    mse = np.mean((img1 - img2) ** 2)
+    if mse == 0:
+        return float('inf')
+    PIXEL_MAX = 255.0
+    psnr = 20 * np.log10(PIXEL_MAX / np.sqrt(mse))
+    return psnr
+
+
 # Random string message
 str_data = generate_random_string(7)
 print(str_data)
 
 # Define image paths
-cover_path = "crmark/compressor/images/color_cover.png"
+cover_path = "images/color_cover.png"
 rec_cover_path = "images/rec_color_cover.png"
 stego_path_clean = "images/color_stego_clean.png"
 stego_path_attacked = "images/color_stego_attacked.png"
 
 # === Case 1: Without attack ===
 # Encode string into image
-success, stego_image = crmark.encode(cover_path, str_data)
+cover_image = np.float32(Image.open(cover_path))
+success, stego_image = crmark.encode(cover_image, str_data)
 stego_image.save(stego_path_clean)
 
 # Recover cover and message from clean image
-is_attacked_clean, rec_cover_clean, rec_message_clean = crmark.recover(stego_path_clean)
-is_decoded, extracted_message_clean = crmark.decode(stego_path_clean)
+stego_clean_image = np.float32(Image.open(stego_path_clean))
+is_attacked_clean, rec_cover_clean, rec_message_clean = crmark.recover(stego_clean_image)
+is_decoded, extracted_message_clean = crmark.decode(stego_clean_image)
 rec_cover_clean.save(rec_cover_path)
 
 # Compute pixel difference between original and recovered cover
@@ -76,8 +88,9 @@ stego[rand_y, rand_x, rand_c] = np.clip(stego[rand_y, rand_x, rand_c] + perturba
 Image.fromarray(np.uint8(stego)).save(stego_path_attacked)
 
 # Recover from attacked image
-is_attacked, rec_cover_attacked, rec_message_attacked = crmark.recover(stego_path_attacked)
-is_attacked_flag, extracted_message_attacked = crmark.decode(stego_path_attacked)
+stego_attacked_image = np.float32(Image.open(stego_path_attacked))
+is_attacked, rec_cover_attacked, rec_message_attacked = crmark.recover(stego_attacked_image)
+is_attacked_flag, extracted_message_attacked = crmark.decode(stego_attacked_image)
 
 rec_attacked = np.float32(rec_cover_attacked)
 diff_attacked = np.sum(np.abs(cover - rec_attacked))
@@ -95,6 +108,7 @@ print("Recovered Message:", rec_message_attacked)
 print("Extracted Message:", extracted_message_attacked)
 print("Is Attacked:", is_attacked)
 print("L1 Pixel Difference:", diff_attacked)
+
 
 ```
 
