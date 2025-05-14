@@ -1,19 +1,72 @@
-import os
-import torch
 import warnings
 import argparse
-import numpy as np
 from tqdm import tqdm
 from torch.optim import AdamW
 from crmark.nets import Model
 from dataloader import HideImage
 from prettytable import PrettyTable
+from crmark.compressor.utils import *
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from crmark.compressor.utils import find_latest_model
 from watermarklab.noiselayers.noiselayerloader import DigitalDistortion
 
 warnings.filterwarnings("ignore")
+
+
+def train_batch(model, args, noise_layer, cover, secret, now_step):
+    stego, drop_z = model.forward(cover, secret, args.hard_round, False)
+    noised_stego = noise_layer(stego, cover, now_step)
+    drop_z_backward = torch.randn_like(drop_z)
+    recon_cover, recon_secret = model.forward(noised_stego, drop_z_backward, args.hard_round, True)
+    loss_penalty = model.PMSE(stego)
+    loss_stego = model.MSE(stego, cover)
+    loss_lpips = model.LLoss(stego, cover)
+    loss_secret = model.MSE(recon_secret, secret)
+    loss = args.lambda_penalty * loss_penalty + args.lambda_stego * loss_stego + args.lambda_lpips * loss_lpips + args.lambda_secret * loss_secret
+    result = {
+        "train_values": {
+            "train_total_loss": loss,
+            "train_accuracy": extract_accuracy(recon_secret, secret),
+            'train_lambda_secret': args.lambda_secret,
+            "train_loss_lpips": loss_lpips.item(),
+            "train_loss_stego": loss_stego.item(),
+            "train_loss_secret": loss_secret.item(),
+            "train_loss_penalty": loss_penalty.item(),
+            "train_overflow_0": overflow_num(stego, 0),
+            "train_overflow_255": overflow_num(stego, 255),
+            "train_stego_psnr": compute_psnr(stego, cover)
+        }
+    }
+    return result
+
+
+def val_batch(model, args, noise_layer, intensity, val_cover, val_secret):
+    secret_shape = (args.batch_size, 1, int(args.bit_length ** 0.5), int(args.bit_length ** 0.5))
+    val_stego, val_drop_z = model.forward(val_cover, val_secret, True, False)
+    val_noised_stego = noise_layer.test(quantize_image(val_stego), val_cover, intensity)
+    round_val_noised_stego = model.round(val_noised_stego, True)
+    val_recon_cover, val_recon_secret = model.forward(round_val_noised_stego, torch.randn_like(val_drop_z), True, True)
+    result = {
+        "val_values": {
+            "val_accuracy": extract_accuracy(val_recon_secret, val_secret),
+            "val_overflow_0": overflow_num(val_stego, 0),
+            "val_overflow_255": overflow_num(val_stego, 255),
+            "val_stego_psnr": compute_psnr(val_stego, val_cover)
+        },
+        "val_images": {
+            "val_cover": val_cover,
+            "val_noised_stego": quantize_image(val_noised_stego),
+            "val_stego": quantize_image(val_stego),
+            "val_residual": quantize_residual_image(val_stego, val_cover),
+            "val_recon_cover": quantize_image(val_recon_cover),
+        }
+    }
+    if int(args.bit_length ** 0.5) ** 2 == args.bit_length:
+        result["val_images"]["val_z"] = quantize_image(val_drop_z.view(secret_shape))
+        result["val_images"]["val_secret"] = quantize_image(val_secret.view(secret_shape))
+        result["val_images"]["val_recon_secret"] = quantize_image(val_recon_secret.view(secret_shape))
+    return result
 
 
 def train(args):
@@ -76,7 +129,7 @@ def train(args):
         for cover, secret in tqdm_epoch:
             cover = cover.to(args.device)
             secret = secret.to(args.device)
-            result = model.train_batch(args, train_noiselayer, cover, secret, now_epoch)
+            result = train_batch(model, args, train_noiselayer, cover, secret, now_epoch)
             total_loss = result["train_values"]["train_total_loss"]
             acc_epoch_list.append(result["train_values"]["train_accuracy"])
             optim_blocks.zero_grad()
@@ -109,7 +162,7 @@ def train(args):
                         val_cover = val_cover.to(args.device)
                         val_secret = val_secret.to(args.device)
                         # Call the val_batch function for each noise layer and intensity
-                        val_result = model.val_batch(args, test_noiselayer.noise_layers[key],
+                        val_result = val_batch(model, args, test_noiselayer.noise_layers[key],
                                                      test_noiselayer.noise_dict[key], val_cover, val_secret)
 
                         # Append values to the lists
@@ -183,7 +236,7 @@ def train_print():
     parser.add_argument('--test_noise_dict', type=dict, default=test_noise_dict)
     parser.add_argument('--hard_round', type=bool, default=False)
     parser.add_argument('--fc', type=bool, default=False)
-    parser.add_argument("--train_name", type=str, default="color_100_s")
+    parser.add_argument("--train_name", type=str, default="color_100_s1")
     parser.add_argument('--max_step', type=int, default=1)
     parser.add_argument('--k_max', type=int, default=1)
     parser.add_argument('--bit_length', type=int, default=100)
@@ -204,7 +257,7 @@ def train_print():
     parser.add_argument('--num_epoch', type=int, default=605)
     parser.add_argument('--seed', type=int, default=99)
     parser.add_argument('--logs_path', type=str, default=r"logs")
-    parser.add_argument('--continue_train', type=bool, default=True)
+    parser.add_argument('--continue_train', type=bool, default=False)
     args = parser.parse_args()
     if torch.cuda.is_available():
         args.device = torch.device(f"cuda:{args.gpu_id}")
