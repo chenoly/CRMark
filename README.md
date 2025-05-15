@@ -12,7 +12,7 @@ Key features:
 ---
 ## 🚀 Usage
 ```bash
-pip install crmark==0.0.4
+pip install crmark==0.1.0
 ```
 
 code
