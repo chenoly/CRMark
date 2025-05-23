@@ -13,7 +13,7 @@ Key features:
 ## 🚀 Usage
 If you encounter any issues while running crmark 0.1.0, please try running it again using Python 3.7 or 3.9.
 ```bash
-pip install crmark==0.1.0
+pip install crmark==0.1.1
 ```
 
 code
