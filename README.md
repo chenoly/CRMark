@@ -134,18 +134,18 @@ else:
 
 🚀 Training
 You can train the models used in the paper with the following commands, which apply common distortion layers:
-'''bash
+```bash
 python train_color.py
-'''
+```
 
-'''bash
+```bash
 python train_gray.py
-'''
+```
 
 For more complex distortions, use the following command:
-'''bash
+```bash
 python train_more.py
-'''
+```
 
 ## 🚀 WatermarkLab
 
