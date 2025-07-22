@@ -137,13 +137,16 @@ You can train the models used in the paper with the following commands, which ap
 '''bash
 python train_color.py
 '''
+
 '''bash
 python train_gray.py
 '''
+
 For more complex distortions, use the following command:
 '''bash
 python train_more.py
 '''
+
 ## 🚀 WatermarkLab
 
 For evaluation and distortion layers, we utilize **WatermarkLab**, a comprehensive watermarking evaluation framework. WatermarkLab provides a wide range of distortion simulations and evaluation metrics to rigorously test the robustness and performance of watermarking algorithms.
