@@ -11,9 +11,8 @@ Key features:
 
 ---
 ## 🚀 Usage
-If you encounter any issues while running crmark 0.1.0, please try running it again using Python 3.7 or 3.9.
 ```bash
-pip install crmark==0.1.1
+pip install crmark==0.1.3
 ```
 
 code
@@ -29,7 +28,7 @@ from crmark import CRMark
 os.makedirs("images", exist_ok=True)
 
 # Initialize CRMark in color mode
-crmark = CRMark(model_mode="color_256_100", float64=False)
+crmark = CRMark()
 
 
 # Generate a random string of length 3 (total 24 bits)
@@ -49,82 +48,102 @@ def calculate_psnr(img1, img2):
 
 
 # Random string message
-str_data = generate_random_string(7)
+str_data = generate_random_string(5)
+str_data = "hello"
 print(str_data)
 
 # Define image paths
-cover_path = "images/color_cover.png"
+cover_path = "realflow_compare/image_11.png"
+# cover_path = "images/cover_color.png"
 rec_cover_path = "images/rec_color_cover.png"
+attack_rec_cover_path = "images/attack_rec_color_cover.png"
 stego_path_clean = "images/color_stego_clean.png"
 stego_path_attacked = "images/color_stego_attacked.png"
+residual_path_clean = "images/color_residual.png"
 
 # === Case 1: Without attack ===
 # Encode string into image
-cover_image = np.float32(Image.open(cover_path))
+cover_image = np.float32(Image.open(cover_path).resize((256, 256)))
 success, stego_image = crmark.encode(cover_image, str_data)
-stego_image.save(stego_path_clean)
+print("psnr:", calculate_psnr(np.float32(stego_image), cover_image))
 
-# Recover cover and message from clean image
-stego_clean_image = np.float32(Image.open(stego_path_clean))
-is_attacked_clean, rec_cover_clean, rec_message_clean = crmark.recover(stego_clean_image)
-is_decoded, extracted_message_clean = crmark.decode(stego_clean_image)
-rec_cover_clean.save(rec_cover_path)
+if success:
+    stego_image.save(stego_path_clean)
+    stego_clean_image = np.float32(stego_image)
+    residual = np.abs((stego_clean_image - cover_image) * 10.) + 127.5
+    Image.fromarray(np.uint8(np.clip(residual, 0, 255))).save(residual_path_clean)
 
-# Compute pixel difference between original and recovered cover
-cover = np.float32(Image.open(cover_path))
-rec_clean = np.float32(rec_cover_clean)
-diff_clean = np.sum(np.abs(cover - rec_clean))
+    # Recover cover and message from clean image
+    stego_clean_image = np.float32(Image.open(stego_path_clean))
+    is_attacked_clean, rec_cover_clean, rec_message_clean = crmark.recover(stego_clean_image)
+    is_decoded, extracted_message_clean = crmark.decode(stego_clean_image)
+    rec_cover_clean.save(rec_cover_path)
 
-# === Case 2: With attack ===
-# Slightly modify the image to simulate attack
-stego = np.float32(Image.open(stego_path_clean))
-H, W, C = stego.shape
-rand_y = random.randint(0, H - 1)
-rand_x = random.randint(0, W - 1)
-rand_c = random.randint(0, C - 1)
+    # Compute pixel difference between original and recovered cover
+    cover = np.float32(Image.open(cover_path).resize((256, 256)))
+    rec_clean = np.float32(rec_cover_clean)
+    diff_clean = np.sum(np.abs(cover - rec_clean))
 
-# Apply a small perturbation (±1)
-perturbation = random.choice([-1, 1])
-stego[rand_y, rand_x, rand_c] = np.clip(stego[rand_y, rand_x, rand_c] + perturbation, 0, 255)
-Image.fromarray(np.uint8(stego)).save(stego_path_attacked)
+    # === Case 2: With attack ===
+    # Slightly modify the image to simulate attack
+    stego = np.float32(Image.open(stego_path_clean))
+    H, W, C = stego.shape
+    rand_y = random.randint(0, H - 1)
+    rand_x = random.randint(0, W - 1)
+    rand_c = random.randint(0, C - 1)
 
-# Recover from attacked image
-stego_attacked_image = np.float32(Image.open(stego_path_attacked))
-is_attacked, rec_cover_attacked, rec_message_attacked = crmark.recover(stego_attacked_image)
-is_attacked_flag, extracted_message_attacked = crmark.decode(stego_attacked_image)
+    # Apply a small perturbation (±1)
+    perturbation = random.choice([-1, 1])
+    stego[rand_y, rand_x, rand_c] = np.clip(stego[rand_y, rand_x, rand_c] + perturbation, 0, 255)
 
-rec_attacked = np.float32(rec_cover_attacked)
-diff_attacked = np.sum(np.abs(cover - rec_attacked))
+    stego = np.clip(stego + np.random.randint(0, 1, size=stego.shape), 0, 255)
 
-# === Print results ===
-print("=== Without Attack ===")
-print("Original Message:", str_data)
-print("Recovered Message:", rec_message_clean)
-print("Extracted Message:", extracted_message_clean)
-print("Is Attacked:", is_attacked_clean)
-print("L1 Pixel Difference:", diff_clean)
+    Image.fromarray(np.uint8(stego)).save(stego_path_attacked)
 
-print("\n=== With Attack ===")
-print("Recovered Message:", rec_message_attacked)
-print("Extracted Message:", extracted_message_attacked)
-print("Is Attacked:", is_attacked)
-print("L1 Pixel Difference:", diff_attacked)
+    # Recover from attacked image
+    stego_attacked_image = np.float32(Image.open(stego_path_attacked))
+    is_attacked, rec_cover_attacked, rec_message_attacked = crmark.recover(stego_attacked_image)
+    is_attacked_flag, extracted_message_attacked = crmark.decode(stego_attacked_image)
+    rec_cover_attacked.save(attack_rec_cover_path)
+
+    rec_attacked = np.float32(rec_cover_attacked)
+    diff_attacked = np.sum(np.abs(cover - rec_attacked))
+
+    # === Print results ===
+    print("=== Without Attack ===")
+    print("Original Message:", str_data)
+    print("Recovered Message:", rec_message_clean)
+    print("Extracted Message:", extracted_message_clean)
+    print("Was Attacked:", is_attacked_clean)
+    print("L1 Pixel Difference:", diff_clean)
+
+    print("\n=== With Attack ===")
+    print("Recovered Message:", rec_message_attacked)
+    print("Extracted Message:", extracted_message_attacked)
+    print("Was Attacked:", is_attacked)
+    print("L1 Pixel Difference:", diff_attacked)
+
+else:
+    print("Emebdding failed!")
+
+
+
 
 
 ```
 
-## 🚀 Training
-
-To train the CRMark model, use the following command:
-
-```bash
+🚀 Training
+You can train the models used in the paper with the following commands, which apply common distortion layers:
+'''bash
 python train_color.py
-```
-```bash
+'''
+'''bash
 python train_gray.py
-```
-
-
+'''
+For more complex distortions, use the following command:
+'''bash
+python train_more.py
+'''
 ## 🚀 WatermarkLab
 
 For evaluation and distortion layers, we utilize **WatermarkLab**, a comprehensive watermarking evaluation framework. WatermarkLab provides a wide range of distortion simulations and evaluation metrics to rigorously test the robustness and performance of watermarking algorithms.
@@ -134,6 +153,13 @@ You can find the WatermarkLab repository here: [github/chenoly/watermarklab](htt
 ---
 
 ## ⚠️ Note  
+When using CRMark, keep the following considerations in mind:
+
+Training with Complex Distortions: Training CRMark on more complex distortions may result in an excessively large norm of the latent variable z, increasing the number of bits required to encode each value in the dependent variable. To address this, CRMark provides a parameter freq_bits_len during initialization to specify the encoding bit length. Setting a longer freq_bits_len can resolve this issue; otherwise, recovery may fail.
+
+Pre-trained Model Characteristics: The watermarks in the provided pre-trained models are generated through random sampling. As a result, these models exhibit strong generalization for randomly sampled watermarks but weaker generalization for watermarks with added error-correcting codes. For practical applications, consider incorporating error-correcting codes into the watermark during training to enhance the robustness of the iIWN model.
+
+
 
 our preprint paper:  
 
