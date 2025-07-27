@@ -164,13 +164,13 @@ Pre-trained Model Characteristics: The watermarks in the provided pre-trained mo
 
 
 
-our preprint paper:  
+🎉CRMark was accepted by ICCV 2025.
 
 ```
-@article{chen2024drrw,
-  title={Deep Robust Reversible Watermarking},
-  author={Jiale Chen and Wei Wang and Chongyang Shi and Li Dong and Yuanman Li and Xiping Hu},
-  journal={arXiv preprint arXiv:2503.02490},
-  year={2024}
+@inproceedings{chen2025learning,
+  title={Learning Robust Image Watermarking with Lossless Cover Recovery},
+  author={Chen, Jiale and Wang, Wei and Shi, Chongyang and Dong, Li and Hu, Xiping},
+  booktitle={Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV)},
+  year={2025}
 }
 ```
