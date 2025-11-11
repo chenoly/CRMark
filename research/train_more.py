@@ -292,7 +292,7 @@ def train_print():
     parser.add_argument("--lambda_stego", type=float, default=1.)
     parser.add_argument("--lambda_lpips", type=float, default=5.)
     parser.add_argument("--lambda_secret", type=float, default=1e4)
-    parser.add_argument("--lambda_z", type=float, default=0.01)
+    parser.add_argument("--lambda_z", type=float, default=1)
     parser.add_argument("--v", type=float, default=0.75)
     parser.add_argument("--lambda_penalty", type=float, default=1e6)
     parser.add_argument("--delta", type=float, default=0.01)
