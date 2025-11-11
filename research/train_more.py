@@ -23,8 +23,9 @@ def train_batch(model, args, noise_layer, cover, secret, now_step):
     loss_penalty = model.PMSE(stego)
     loss_stego = model.MSE(stego, cover)
     loss_lpips = model.LLoss(stego, cover)
+    loss_z = model.MSE(drop_z, torch.zeros_like(drop_z))
     loss_secret = model.MSE(recon_secret, secret)
-    loss = args.lambda_penalty * loss_penalty + args.lambda_stego * loss_stego + args.lambda_lpips * loss_lpips + args.lambda_secret * loss_secret
+    loss = args.lambda_penalty * loss_penalty + args.lambda_stego * loss_stego + args.lambda_lpips * loss_lpips + args.lambda_secret * loss_secret + args.lambda_z * loss_z
     result = {
         "train_values": {
             "train_total_loss": loss,
