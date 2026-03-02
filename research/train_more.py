@@ -9,8 +9,8 @@ from crmark.compressor.utils import *
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from crmark.compressor.utils import find_latest_model
-from watermarklab.noiselayers.diffdistortions import *
-from watermarklab.noiselayers.noiselayerloader import DistortionLoader
+from watermarklab.attackers.diffattackers import *
+from watermarklab.attackers.attackerloader import DistortionLoader
 
 warnings.filterwarnings("ignore")
 
