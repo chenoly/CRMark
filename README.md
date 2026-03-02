@@ -132,26 +132,30 @@ else:
 
 ```
 
-🚀 Training
-You can train the models used in the paper with the following commands, which apply common distortion layers:
+## 🚀 Training
+
+You can train the models used in the paper using the commands below.  
+These commands apply common distortion layers:
+
 ```bash
-python train_color.py
+python train_color.py    # requires watermarklab == 0.0.12
 ```
 
 ```bash
-python train_gray.py
+python train_gray.py     # requires watermarklab == 0.0.12
 ```
 
-For more complex distortions, use the following command:
+For training with more complex distortions, use:
+
 ```bash
-python train_more.py
+python train_more.py     # requires watermarklab == 0.1.22
 ```
 
 ## 🚀 WatermarkLab
 
 For evaluation and distortion layers, we utilize **WatermarkLab**, a comprehensive watermarking evaluation framework. WatermarkLab provides a wide range of distortion simulations and evaluation metrics to rigorously test the robustness and performance of watermarking algorithms.
 
-You can find the WatermarkLab repository here: [github/chenoly/watermarklab](https://github.com/chenoly/watermarklab)
+You can find the WatermarkLab repository here: [github/chenoly/watermarklab](https://github.com/chenoly/watermarklab)(https://watermarklab.github.io/)
 
 ---
 
